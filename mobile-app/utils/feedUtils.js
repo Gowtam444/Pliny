@@ -1,6 +1,7 @@
 import * as rssParser from 'react-native-rss-parser';
 import axios from 'axios';
 import { decode } from 'html-entities';
+import { Platform } from 'react-native';
 
 const SOURCES = [
   { id: 'google_news', name: 'Google News', url: 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en' },
@@ -18,8 +19,13 @@ export const fetchFeeds = async (selectedSources = []) => {
 
   for (const source of sourcesToFetch) {
     try {
-      // Adding standard headers to bypass bot protection/429 errors
-      const response = await axios.get(source.url, {
+      // If running on Web, use a free CORS proxy to avoid browser Network Errors.
+      // On mobile, native networking ignores CORS.
+      const targetUrl = Platform.OS === 'web'
+        ? `https://api.allorigins.win/raw?url=${encodeURIComponent(source.url)}`
+        : source.url;
+
+      const response = await axios.get(targetUrl, {
         timeout: 10000,
         headers: {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
@@ -55,14 +61,12 @@ const extractImage = (item) => {
   }
 
   if (item.description) {
-    // Try to find image in description HTML
     const imgMatch = item.description.match(/<img[^>]+src="([^">]+)"/);
     if (imgMatch) {
       return imgMatch[1];
     }
   }
 
-  // Fallback placeholder based on source
   return null;
 };
 
