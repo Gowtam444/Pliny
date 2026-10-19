@@ -20,13 +20,13 @@ export const fetchFeeds = async (selectedSources = []) => {
   for (const source of sourcesToFetch) {
     try {
       // If running on Web, use a free CORS proxy to avoid browser Network Errors.
-      // On mobile, native networking ignores CORS.
+      // corsproxy.io is generally faster than allorigins
       const targetUrl = Platform.OS === 'web'
-        ? `https://api.allorigins.win/raw?url=${encodeURIComponent(source.url)}`
+        ? `https://corsproxy.io/?${encodeURIComponent(source.url)}`
         : source.url;
 
       const response = await axios.get(targetUrl, {
-        timeout: 10000,
+        timeout: 30000,
         headers: {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
