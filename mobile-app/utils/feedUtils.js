@@ -19,19 +19,34 @@ export const fetchFeeds = async (selectedSources = []) => {
 
   for (const source of sourcesToFetch) {
     try {
-      // If running on Web, use a free CORS proxy to avoid browser Network Errors.
-      // corsproxy.io is generally faster than allorigins
+      // Due to public CORS proxy instability and aggressive rate limiting on web,
+      // fall back directly to the source if web proxy attempts fail. Note: On a real production
+      // web deployment, you must host your own simple reverse proxy server (e.g. via Next.js API route,
+      // Express, or Cloudflare worker) rather than relying on public corsproxy/allorigins.
       const targetUrl = Platform.OS === 'web'
-        ? `https://corsproxy.io/?${encodeURIComponent(source.url)}`
+        ? `https://api.allorigins.win/raw?url=${encodeURIComponent(source.url)}`
         : source.url;
 
-      const response = await axios.get(targetUrl, {
-        timeout: 30000,
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
-      });
+      let response;
+      try {
+        response = await axios.get(targetUrl, {
+          timeout: 20000,
+          headers: {
+              'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          }
+        });
+      } catch (proxyError) {
+         if (Platform.OS === 'web') {
+           // Fallback to direct request (this works if user has a CORS unblocker extension, or if
+           // source allows it, although it may still fail due to strict browser CORS policies)
+           console.warn(`Proxy failed for ${source.name}, attempting direct fetch...`);
+           response = await axios.get(source.url, { timeout: 15000 });
+         } else {
+           throw proxyError;
+         }
+      }
+
       const parsedData = await rssParser.parse(response.data);
 
       const items = parsedData.items.map(item => ({
